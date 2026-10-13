@@ -389,6 +389,15 @@ def main():
                 post_hold_out(context, args.holdout)
             post_confirm_data(context)
 
+            imported_zip = get_results_zip(
+                context, ["original.dataset"], "import"
+            )
+            imported_dir = (
+                base_dir / "experiment_results" / args.dataset / "import" / "files"
+            )
+            save_result_files(imported_zip, imported_dir, run_timestamp, "import")
+            print_info(context, f"Saved imported datasets to {output_dir}")
+
             post_config(context, "anonymization", anonymization_config, "/api/anonymization/")
             post_config(
                 context, "synthetization_configuration", synthetization_config, synth_algo_url
