@@ -452,7 +452,7 @@ def main():
             save_result_files(risk_zip, anon_risk_eval_dir, run_timestamp, "risk evaluation")
             print_info(context, f"Saved anonymized datasets to {output_dir}")
 
-            print_info(context, "Phase 2: synthetization + evaluation")
+            print_info(context, "Phase 2: anonymization + synthetization + evaluation")
             post_configure(context, "synthetization", skip=False)
             run_stage(context, "execution", job_name="synthetization")
             run_stage(context, "evaluation")
@@ -486,6 +486,45 @@ def main():
             save_result_files(
                 risk_zip, anon_synth_risk_eval_dir, run_timestamp, "risk evaluation"
             )
+
+            print_info(context, "Phase 3: synthetization + evaluation")
+
+            post_configure(context, "anonymization", skip=True)
+            post_configure(context, "synthetization", skip=False)
+
+            run_stage(context, "execution")
+            run_stage(context, "evaluation")
+
+            synth_zip = get_results_zip(
+                context, ["pipeline.execution.synthetization.dataset"], "synthetization"
+            )
+            synth_output_dir = (
+                base_dir / "experiment_results" / args.dataset / "synth" / "files"
+            )
+            save_anonymized_datasets(synth_zip, synth_output_dir, run_timestamp)
+
+            synth_tech_eval_dir = (
+                base_dir / "experiment_results" / args.dataset / "synth" / "tech_eval"
+            )
+            tech_zip = get_results_zip(
+                context,
+                ["pipeline.evaluation.technical_evaluation.other"],
+                "technical evaluation",
+            )
+            save_result_files(
+                tech_zip, synth_tech_eval_dir, run_timestamp, "technical evaluation"
+            )
+
+            synth_risk_eval_dir = (
+                base_dir / "experiment_results" / args.dataset / "synth" / "risk_eval"
+            )
+            risk_zip = get_results_zip(
+                context, ["pipeline.evaluation.risk_evaluation.other"], "risk evaluation"
+            )
+            save_result_files(
+                risk_zip, synth_risk_eval_dir, run_timestamp, "risk evaluation"
+            )
+
         finally:
             if not args.keep_user:
                 delete_user(context)
