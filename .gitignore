@@ -57,3 +57,4 @@ __pycache__/
 /simulation/experiment_results/
 /simulation/experiments_results/
 /simulation/dataset_configs/use_case*
+/simulation/dataset_configs/skin_cancer
