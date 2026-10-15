@@ -32,20 +32,23 @@ DEFAULT_ROOT = BASE_DIR / "experiment_results"
 SUMMARY_XLSX = "evaluation_summary.xlsx"
 SUMMARY_CSV = "evaluation_summary.csv"
 
-LABELS = ["real", "anon", "anon_synth"]
+LABELS = ["real", "anon", "synth", "anon_synth"]
 LABEL_TITLES = {
     "real": "Real",
     "anon": "Anonymized",
-    "anon_synth": "Anon+Synth",
+    "synth": "Synthetic",
+    "anon_synth": "Anonymized + Synthetic",
 }
 COLORS = {
     "real": "#333333",
     "anon": "#1b6ca8",
+    "synth": "#e76f51",
     "anon_synth": "#2a9d8f",
 }
 MARKERS = {
     "real": "o",
     "anon": "o",
+    "synth": "o",
     "anon_synth": "o",
 }
 
@@ -270,6 +273,14 @@ def plot_privacy_utility_tradeoff(
                 arrowprops=dict(arrowstyle="->", color="#555555", lw=1.0, alpha=0.7),
                 zorder=3,
             )
+        if "real" in mean_points and "synth" in mean_points:
+            ax.annotate(
+                "",
+                xy=mean_points["synth"],
+                xytext=mean_points["real"],
+                arrowprops=dict(arrowstyle="->", color="#555555", lw=1.0, alpha=0.7),
+                zorder=3,
+            )
         if "anon" in mean_points and "anon_synth" in mean_points:
             ax.annotate(
                 "",
@@ -336,7 +347,7 @@ def plot_privacy_utility_heatmap(
     if not dataset_names:
         raise RuntimeError("No datasets found to plot.")
 
-    labels = ["real", "anon", "anon_synth"]
+    labels = LABELS
     columns = [
         ("Utility", "combined_utility", "overall_utility"),
         ("Privacy", "privacy_score", None),
@@ -430,7 +441,7 @@ def plot_privacy_utility_heatmap(
     norm = Normalize(vmin=0, vmax=1)
 
     fig_height = max(2.5, 0.55 * len(dataset_names) + 1.5)
-    fig, ax = plt.subplots(figsize=(10.2, fig_height))
+    fig, ax = plt.subplots(figsize=(13.4, fig_height))
 
     col_widths = [gap_width if spec["is_gap"] else 1.0 for spec in col_specs]
     x_edges = [0.0]

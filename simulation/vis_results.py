@@ -21,10 +21,11 @@ DEFAULT_ROOT = BASE_DIR / "experiment_results" / DEFAULT_DATASET
 SUMMARY_XLSX = "evaluation_summary.xlsx"
 SUMMARY_CSV = "evaluation_summary.csv"
 
-LABELS = ["real", "anon", "anon_synth"]
+LABELS = ["real", "anon", "synth", "anon_synth"]
 COLORS = {
     "real": "#333333",
     "anon": "#1f77b4",
+    "synth": "#ff7f0e",
     "anon_synth": "#2ca02c",
 }
 
@@ -119,6 +120,13 @@ def plot_privacy_utility_tradeoff(rows: List[Dict[str, Any]], output_path: Path)
             ax.annotate(
                 "",
                 xy=points["anon"],
+                xytext=points["real"],
+                arrowprops=dict(arrowstyle="->", color="#888888", alpha=0.4),
+            )
+        if "real" in points and "synth" in points:
+            ax.annotate(
+                "",
+                xy=points["synth"],
                 xytext=points["real"],
                 arrowprops=dict(arrowstyle="->", color="#888888", alpha=0.4),
             )
