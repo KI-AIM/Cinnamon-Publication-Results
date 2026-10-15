@@ -15,6 +15,8 @@ DEFAULT_SUBFOLDERS = [
     "anon_synth/tech_eval",
     "anon_synth/risk_eval",
     "real_risk",
+    "synth/tech_eval",
+    "synth/risk_eval",
 ]
 
 DEFAULT_DATASET = "cardiovascular"
@@ -24,6 +26,7 @@ DEFAULT_ROOT = BASE_DIR / "experiment_results" / DEFAULT_DATASET
 TECH_EVAL_FOLDERS = {
     "anon": "anon/tech_eval",
     "anon_synth": "anon_synth/tech_eval",
+    "synth": "synth/tech_eval",
 }
 
 TECH_EVAL_METRICS = [
@@ -37,6 +40,7 @@ RISK_FOLDERS = {
     "anon": "anon/risk_eval",
     "anon_synth": "anon_synth/risk_eval",
     "real": "real_risk",
+    "synth": "synth/risk_eval",
 }
 
 RISK_METRICS = [
@@ -78,6 +82,9 @@ def extract_overview_metrics(payload: Any) -> Dict[str, Dict[str, Any]]:
     if not isinstance(overview, dict):
         return {}
     aggregated = overview.get("aggregated_metrics", [])
+    # Newer evaluation results store the aggregated metrics as a single dict
+    if isinstance(aggregated, dict):
+        aggregated = [aggregated]
     if not isinstance(aggregated, list):
         return {}
 
@@ -117,6 +124,8 @@ def build_rows(
     anon_risk_items: List[Tuple[Path, Any]],
     anon_synth_risk_items: List[Tuple[Path, Any]],
     real_risk_items: List[Tuple[Path, Any]],
+    synth_items: List[Tuple[Path, Any]],
+    synth_risk_items: List[Tuple[Path, Any]],
 ) -> List[Dict[str, Any]]:
     max_runs = max(
         len(anon_items),
@@ -124,6 +133,8 @@ def build_rows(
         len(anon_risk_items),
         len(anon_synth_risk_items),
         len(real_risk_items),
+        len(synth_items),
+        len(synth_risk_items),
     )
     rows: List[Dict[str, Any]] = []
     for run_index in range(max_runs):
@@ -153,17 +164,30 @@ def build_rows(
             if run_index < len(real_risk_items)
             else {}
         )
+        synth_metrics = (
+            extract_overview_metrics(synth_items[run_index][1])
+            if run_index < len(synth_items)
+            else {}
+        )
+        synth_risk = (
+            extract_risk_metrics(synth_risk_items[run_index][1])
+            if run_index < len(synth_risk_items)
+            else {}
+        )
 
         for metric in TECH_EVAL_METRICS:
             real_value = None
             if metric in anon_metrics and anon_metrics[metric].get("real") is not None:
                 real_value = anon_metrics[metric].get("real")
-            elif metric in anon_synth_metrics:
+            elif metric in anon_synth_metrics and anon_synth_metrics[metric].get("real") is not None:
                 real_value = anon_synth_metrics[metric].get("real")
+            elif metric in synth_metrics:
+                real_value = synth_metrics[metric].get("real")
 
             row[f"{metric}_real"] = real_value
             row[f"{metric}_anon"] = anon_metrics.get(metric, {}).get("synthetic")
             row[f"{metric}_anon_synth"] = anon_synth_metrics.get(metric, {}).get("synthetic")
+            row[f"{metric}_synth"] = synth_metrics.get(metric, {}).get("synthetic")
 
         def combined_value(resemblance: Any, utility: Any) -> Any:
             if resemblance is None or utility is None:
@@ -179,11 +203,15 @@ def build_rows(
         row[f"{COMBINED_UTILITY_METRIC}_anon_synth"] = combined_value(
             row.get("overall_resemblance_anon_synth"), row.get("overall_utility_anon_synth")
         )
+        row[f"{COMBINED_UTILITY_METRIC}_synth"] = combined_value(
+            row.get("overall_resemblance_synth"), row.get("overall_utility_synth")
+        )
 
         for metric in RISK_METRICS:
             real_value = real_risk.get(metric)
             anon_value = anon_risk.get(metric)
             anon_synth_value = anon_synth_risk.get(metric)
+            synth_value = synth_risk.get(metric)
             row[f"{PRIVACY_METRIC}_real"] = (
                 1.0 - real_value if real_value is not None else None
             )
@@ -192,6 +220,9 @@ def build_rows(
             )
             row[f"{PRIVACY_METRIC}_anon_synth"] = (
                 1.0 - anon_synth_value if anon_synth_value is not None else None
+            )
+            row[f"{PRIVACY_METRIC}_synth"] = (
+                1.0 - synth_value if synth_value is not None else None
             )
 
         rows.append(row)
@@ -212,6 +243,7 @@ def write_excel(rows: List[Dict[str, Any]], output_path: Path) -> None:
                 f"{metric}_real",
                 f"{metric}_anon",
                 f"{metric}_anon_synth",
+                f"{metric}_synth",
             ]
         )
     headers.extend(
@@ -219,6 +251,7 @@ def write_excel(rows: List[Dict[str, Any]], output_path: Path) -> None:
             f"{COMBINED_UTILITY_METRIC}_real",
             f"{COMBINED_UTILITY_METRIC}_anon",
             f"{COMBINED_UTILITY_METRIC}_anon_synth",
+            f"{COMBINED_UTILITY_METRIC}_synth",
         ]
     )
     headers.extend(
@@ -226,6 +259,7 @@ def write_excel(rows: List[Dict[str, Any]], output_path: Path) -> None:
             f"{PRIVACY_METRIC}_real",
             f"{PRIVACY_METRIC}_anon",
             f"{PRIVACY_METRIC}_anon_synth",
+            f"{PRIVACY_METRIC}_synth",
         ]
     )
     sheet.append(headers)
@@ -268,12 +302,16 @@ def main() -> None:
     anon_risk_items = loaded.get(RISK_FOLDERS["anon"], [])
     anon_synth_risk_items = loaded.get(RISK_FOLDERS["anon_synth"], [])
     real_risk_items = loaded.get(RISK_FOLDERS["real"], [])
+    synth_items = loaded.get(TECH_EVAL_FOLDERS["synth"], [])
+    synth_risk_items = loaded.get(RISK_FOLDERS["synth"], [])
     rows = build_rows(
         anon_items,
         anon_synth_items,
         anon_risk_items,
         anon_synth_risk_items,
         real_risk_items,
+        synth_items,
+        synth_risk_items,
     )
     write_excel(rows, output)
     print(f"Wrote evaluation summary to {output}")
