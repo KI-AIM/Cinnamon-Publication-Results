@@ -349,13 +349,17 @@ def plot_privacy_utility_heatmap(
 
     labels = LABELS
     columns = [
-        ("Utility", "combined_utility", "overall_utility"),
+        ("Resemblance", "overall_resemblance", None),
+        ("Utility", "overall_utility", None),
         ("Privacy", "privacy_score", None),
     ]
     gap_width = 0.5
     col_specs: List[Dict[str, Any]] = []
     for label_index, label in enumerate(labels):
         for metric_title, metric_key, fallback in columns:
+            # The real data always resembles itself perfectly
+            if label == "real" and metric_key == "overall_resemblance":
+                continue
             label_title = LABEL_TITLES[label]
             col_specs.append(
                 {
@@ -440,8 +444,8 @@ def plot_privacy_utility_heatmap(
     cmap.set_bad("#ffffff")
     norm = Normalize(vmin=0, vmax=1)
 
-    fig_height = max(2.5, 0.55 * len(dataset_names) + 1.5)
-    fig, ax = plt.subplots(figsize=(13.4, fig_height))
+    fig_height = max(2.5, 0.7 * len(dataset_names) + 1.5)
+    fig, ax = plt.subplots(figsize=(16.0, fig_height))
 
     col_widths = [gap_width if spec["is_gap"] else 1.0 for spec in col_specs]
     x_edges = [0.0]
@@ -475,15 +479,10 @@ def plot_privacy_utility_heatmap(
     ax.tick_params(which="minor", bottom=False, left=False)
 
     group_centers = []
-    col_index = 0
-    for label_index, label in enumerate(labels):
-        first = col_index
-        last = col_index + len(columns) - 1
-        group_center = (x_edges[first] + x_edges[last + 1]) / 2
+    for label in labels:
+        indices = [idx for idx, spec in enumerate(col_specs) if spec.get("label_key") == label]
+        group_center = (x_edges[indices[0]] + x_edges[indices[-1] + 1]) / 2
         group_centers.append((group_center, LABEL_TITLES[label]))
-        col_index += len(columns)
-        if label_index < len(labels) - 1:
-            col_index += 1
 
     for center, title in group_centers:
             ax.text(
@@ -503,24 +502,30 @@ def plot_privacy_utility_heatmap(
             value = data[i][j]
             std = stds[i][j]
             if value != value:
-                text = ""
-                text_color = "#666666"
-            else:
-                if std is None:
-                    text = f"{value:.2f}"
-                else:
-                    text = f"{value:.2f}+/-{std:.2f}"
-                text_color = "#111111"
+                continue
+            # Mean on top, standard deviation below to keep the columns narrow
+            mean_y = i + 0.5 if std is None else i + 0.4
             ax.text(
                 center,
-                i + 0.5,
-                text,
+                mean_y,
+                f"{value:.2f}",
                 ha="center",
                 va="center",
                 fontsize=9,
                 fontweight="normal",
-                color=text_color,
+                color="#111111",
             )
+            if std is not None:
+                ax.text(
+                    center,
+                    i + 0.68,
+                    f"±{std:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=7.5,
+                    fontweight="normal",
+                    color="#333333",
+                )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.02)
     cbar.ax.set_ylabel("Score", rotation=90, labelpad=8)
