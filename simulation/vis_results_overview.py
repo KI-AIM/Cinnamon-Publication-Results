@@ -32,6 +32,9 @@ DEFAULT_ROOT = BASE_DIR / "experiment_results"
 SUMMARY_XLSX = "evaluation_summary.xlsx"
 SUMMARY_CSV = "evaluation_summary.csv"
 
+DEFAULT_DPI = 300
+PAD_INCHES = 0.03
+
 LABELS = ["real", "anon", "synth", "anon_synth"]
 LABEL_TITLES = {
     "real": "Real",
@@ -181,10 +184,22 @@ def get_dataset_size(dataset_name: str) -> Optional[int]:
         return None
 
 
+def save_figure(fig, output_path: Path, max_width: Optional[int] = None) -> None:
+    dpi: float = DEFAULT_DPI
+    if max_width is not None:
+        # Lower the resolution so the tightly cropped image fits within max_width pixels
+        fig.canvas.draw()
+        bbox = fig.get_tightbbox(fig.canvas.get_renderer())
+        width_inches = bbox.width + 2 * PAD_INCHES
+        dpi = min(dpi, math.floor(max_width / width_inches * 100) / 100)
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", pad_inches=PAD_INCHES)
+
+
 def plot_privacy_utility_tradeoff(
     dataset_rows: Dict[str, List[Dict[str, Any]]],
     dataset_sizes: Dict[str, Optional[int]],
     output_path: Path,
+    max_width: Optional[int] = None,
 ) -> None:
     if plt is None:
         raise RuntimeError("matplotlib is required to plot figures. Install it with: pip install matplotlib")
@@ -332,13 +347,14 @@ def plot_privacy_utility_tradeoff(
         bbox_to_anchor=(0.5, 0.98),
     )
     fig.tight_layout(rect=(0, 0.02, 1, 0.93))
-    fig.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.03)
+    save_figure(fig, output_path, max_width)
     plt.close(fig)
 
 
 def plot_privacy_utility_heatmap(
     dataset_rows: Dict[str, List[Dict[str, Any]]],
     output_path: Path,
+    max_width: Optional[int] = None,
 ) -> None:
     if plt is None or ListedColormap is None or Normalize is None:
         raise RuntimeError("matplotlib is required to plot figures. Install it with: pip install matplotlib")
@@ -535,7 +551,7 @@ def plot_privacy_utility_heatmap(
     ax.set_ylabel("")
     ax.spines["top"].set_visible(False)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
-    fig.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.03)
+    save_figure(fig, output_path, max_width)
     plt.close(fig)
 
 
@@ -581,7 +597,14 @@ def main() -> None:
         "--summary",
         help="Explicit path to the summary file (xlsx or csv).",
     )
+    parser.add_argument(
+        "--max-width",
+        type=int,
+        help="Maximum width of the generated charts in pixels. Lowers the resolution if necessary.",
+    )
     args = parser.parse_args()
+    if args.max_width is not None and args.max_width <= 0:
+        parser.error("--max-width must be a positive number of pixels.")
 
     root = Path(args.root)
     if not root.exists():
@@ -608,10 +631,12 @@ def main() -> None:
         dataset_rows,
         dataset_sizes,
         output_dir / "privacy_utility_tradeoff_overview.png",
+        max_width=args.max_width,
     )
     plot_privacy_utility_heatmap(
         dataset_rows,
         output_dir / "privacy_utility_heatmap_overview.png",
+        max_width=args.max_width,
     )
     print(f"Saved figures to {output_dir}")
 
