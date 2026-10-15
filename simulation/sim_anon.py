@@ -202,7 +202,7 @@ def run_stage(context: CinnamonContext, stage_name: str, job_name: Optional[str]
 def get_results_zip(context: CinnamonContext, resources: List[str], label: str):
     url = f"{CINNAMON_URL}/project/zip"
     print_info(context, f"Downloading {label} results...")
-    params = {"resources": resources}
+    params = {"resources": resources, "holdOutSelector": "NOT_HOLD_OUT"}
     response = requests.get(url, auth=create_auth(context), params=params)
     request_or_raise(response, f"download {label} results")
     print_info(context, f"{label} results downloaded.")
