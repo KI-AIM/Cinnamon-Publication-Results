@@ -111,11 +111,20 @@ def extract_overview_metrics(payload: Any) -> Dict[str, Dict[str, Any]]:
 def extract_risk_metrics(payload: Any) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         return {}
-    metrics: Dict[str, Any] = {}
-    for metric in RISK_METRICS:
-        if metric in payload:
-            metrics[metric] = payload.get(metric)
-    return metrics
+
+    def risk_value(metric: str, key: str) -> Any:
+        value = payload.get(metric)
+        return value.get(key) if isinstance(value, dict) else None
+
+    linkage = risk_value("linkage_health_risk", "risk_value")
+    inference = risk_value("inference_average_risk", "priv_risk")
+    univariate = risk_value("univariate_singling_out_risk", "risk_value")
+    multivariate = risk_value("multivariate_singling_out_risk", "risk_value")
+    if None in (linkage, inference, univariate, multivariate):
+        return {}
+
+    singling_out = max(univariate, multivariate)
+    return {"total_risk_score": (linkage + inference + singling_out) / 3}
 
 
 def build_rows(
