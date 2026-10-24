@@ -234,11 +234,14 @@ def plot_privacy_utility_tradeoff(
         sharey=True,
     )
     axes_list = flatten_axes(axes)
+    tradeoff_stats: Dict[str, Dict[str, Optional[float]]] = {}
 
     for ax, dataset_name in zip(axes_list, dataset_names):
         rows = dataset_rows[dataset_name]
         run_points: Dict[str, List[Tuple[float, float]]] = {label: [] for label in LABELS}
         mean_points: Dict[str, Tuple[float, float]] = {}
+        dataset_stats: Dict[str, Optional[float]] = {}
+        tradeoff_stats[dataset_name] = dataset_stats
 
         for row in rows:
             for label in LABELS:
@@ -266,6 +269,10 @@ def plot_privacy_utility_tradeoff(
             utilities = collect_metric(rows, "combined_utility", label, fallback_key="overall_utility")
             mean_risk, std_risk = compute_stats(risks)
             mean_utility, std_utility = compute_stats(utilities)
+            dataset_stats[f"privacy_{label}_mean"] = mean_risk
+            dataset_stats[f"privacy_{label}_std"] = std_risk
+            dataset_stats[f"combined_utility_{label}_mean"] = mean_utility
+            dataset_stats[f"combined_utility_{label}_std"] = std_utility
 
             if mean_risk is None or mean_utility is None:
                 continue
@@ -321,6 +328,32 @@ def plot_privacy_utility_tradeoff(
 
     for ax in axes_list[len(dataset_names) :]:
         ax.axis("off")
+
+    csv_output = output_path.with_suffix(".csv")
+    json_output = output_path.with_suffix(".json")
+    stat_keys: List[str] = []
+    for label in LABELS:
+        for metric in ("privacy", "combined_utility"):
+            stat_keys.extend([f"{metric}_{label}_mean", f"{metric}_{label}_std"])
+    with csv_output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["dataset"] + stat_keys)
+        for dataset_name in dataset_names:
+            dataset_stats = tradeoff_stats[dataset_name]
+            row = [dataset_name]
+            for key in stat_keys:
+                value = dataset_stats.get(key)
+                row.append("" if value is None else value)
+            writer.writerow(row)
+
+    json_rows: List[Dict[str, Any]] = []
+    for dataset_name in dataset_names:
+        payload: Dict[str, Any] = {"dataset": dataset_name}
+        for key in stat_keys:
+            payload[key] = tradeoff_stats[dataset_name].get(key)
+        json_rows.append(payload)
+    with json_output.open("w", encoding="utf-8") as handle:
+        json.dump(json_rows, handle, indent=2)
 
     fig.supxlabel("Privacy Score", y=0.015)
     fig.supylabel("Utility Score")
