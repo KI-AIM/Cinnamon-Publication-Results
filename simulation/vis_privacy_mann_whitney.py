@@ -29,6 +29,8 @@ METRICS = {
     "linkage_health_risk": ("Linkage Risk", "risk_value"),
     "singling_out_risk": ("Singling-out Risk", None),
 }
+DEFAULT_DPI = 300
+PAD_INCHES = 0.03
 
 
 def finite_number(value: Any) -> Optional[float]:
@@ -131,7 +133,22 @@ def write_csv(results: Sequence[Mapping[str, Any]], output_path: Path) -> None:
         writer.writerows(results)
 
 
-def plot_heatmap(results: Sequence[Mapping[str, Any]], output_path: Path) -> None:
+def save_figure(fig, output_path: Path, max_width: Optional[int] = None) -> None:
+    dpi: float = DEFAULT_DPI
+    if max_width is not None:
+        # Lower the resolution so the tightly cropped image fits within max_width pixels
+        fig.canvas.draw()
+        bbox = fig.get_tightbbox(fig.canvas.get_renderer())
+        width_inches = bbox.width + 2 * PAD_INCHES
+        dpi = min(dpi, math.floor(max_width / width_inches * 100) / 100)
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", pad_inches=PAD_INCHES)
+
+
+def plot_heatmap(
+    results: Sequence[Mapping[str, Any]],
+    output_path: Path,
+    max_width: Optional[int] = None,
+) -> None:
     datasets = sorted({str(result["dataset"]) for result in results})
     result_by_key = {(result["dataset"], result["metric"]): result for result in results}
     gap_width = 0.5
@@ -284,7 +301,7 @@ def plot_heatmap(results: Sequence[Mapping[str, Any]], output_path: Path) -> Non
     ax.spines["top"].set_visible(False)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.03)
+    save_figure(fig, output_path, max_width)
     plt.close(fig)
 
 
@@ -303,12 +320,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Plot privacy attacks for all variants with Mann–Whitney U tests.")
     parser.add_argument("--results-root", type=Path, default=DEFAULT_RESULTS_ROOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--max-width",
+        type=int,
+        help="Maximum width of the generated chart in pixels. Lowers the resolution if necessary.",
+    )
     args = parser.parse_args()
+    if args.max_width is not None and args.max_width <= 0:
+        parser.error("--max-width must be a positive number of pixels.")
 
     self_check()
     results = calculate_results(collect_risk_documents(args.results_root))
     write_csv(results, args.output.with_suffix(".csv"))
-    plot_heatmap(results, args.output)
+    plot_heatmap(results, args.output, args.max_width)
     print(f"Saved {args.output} and {args.output.with_suffix('.csv')}")
 
 
