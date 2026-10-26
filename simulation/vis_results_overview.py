@@ -356,7 +356,7 @@ def plot_privacy_utility_tradeoff(
         json.dump(json_rows, handle, indent=2)
 
     fig.supxlabel("Privacy Score", y=0.015)
-    fig.supylabel("Utility Score")
+    fig.supylabel("Combined Utility Score")
 
     legend_handles = [
         Line2D(
@@ -399,7 +399,7 @@ def plot_privacy_utility_heatmap(
     labels = LABELS
     columns = [
         ("Resemblance", "overall_resemblance", None),
-        ("Utility", "overall_utility", None),
+        ("ML-Utility", "overall_utility", None),
         ("Privacy", "privacy_score", None),
     ]
     gap_width = 0.5
